@@ -11,56 +11,115 @@ import configparser
 # --------------------------
 # Parquet-Dateien exportieren
 # --------------------------
-def export_df_to_parquet(df, filename, logfile=None, screen=True):
+def export_df_to_parquet(df, filename, compression=None, logfile=None, screen=True):
     """
     Exportiert einen DataFrame in eine Parquet-Datei.
 
     Parameter:
         df (pandas.DataFrame): Der zu exportierende DataFrame.
         filename (str): Der Pfad zur Zieldatei.
+        compression (str, optional): Komprimierung ('snappy', 'gzip', 'brotli', None).
         logfile (str, optional): Der Pfad zum Logfile.
         screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden.
 
     Rückgabe:
-        None
+        bool: True bei erfolgreichem Export, False bei Fehler.
     """
     try:
+        # Typprüfung DataFrame
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError("Das übergebene Objekt ('df') ist kein gültiger pandas.DataFrame.")
+        
+        # Prüfung auf leeren DataFrame
+        if df.empty:
+            raise ValueError("Der DataFrame ist leer und kann nicht exportiert werden.")
+        
+        # Dateiendung prüfen
         if not filename.endswith('.parquet'):
             raise ValueError(f"Die Datei '{filename}' hat keine '.parquet'-Endung.")
-        df.to_parquet(filename)
+        
+        # Verzeichnis erstellen falls nicht vorhanden
+        dir_name = os.path.dirname(filename)
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name, exist_ok=True)
+            screen_and_log(f"Info: Verzeichnis '{dir_name}' wurde erstellt.", logfile, screen)
+        
+        # DataFrame exportieren
+        df.to_parquet(filename, compression=compression)
         screen_and_log(f"Info: DataFrame erfolgreich in '{filename}' exportiert.", logfile, screen)
+        return True
+        
+    except FileNotFoundError as e:
+        screen_and_log(f"ERROR: Datei oder Verzeichnis nicht gefunden: {e}", logfile, screen)
+        return False
+    except PermissionError:
+        screen_and_log(f"ERROR: Keine Schreibberechtigung für die Datei '{filename}'.", logfile, screen)
+        return False
+    except ValueError as e:
+        screen_and_log(f"ERROR: Ungültige Eingabe: {e}", logfile, screen)
+        return False
     except Exception as e:
         screen_and_log(f"ERROR: Fehler beim Exportieren des DataFrames in '{filename}': {e}", logfile, screen)
+        return False
 
 # --------------------------
 # Excel-Dateien exportieren
 # --------------------------
-def export_df_to_excel(df, filename, logfile=None, screen=True):
+def export_df_to_excel(df, filename, sheet_name='Sheet1', logfile=None, screen=True):
     """
     Exportiert einen DataFrame in eine Excel-Datei.
 
     Parameter:
         df (pandas.DataFrame): Der zu exportierende DataFrame.
         filename (str): Der Pfad zur Zieldatei.
+        sheet_name (str): Name des Arbeitsblatts (Standard: 'Sheet1').
         logfile (str, optional): Der Pfad zum Logfile.
         screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden.
 
     Rückgabe:
-        None
+        bool: True bei erfolgreichem Export, False bei Fehler.
     """
     try:
+        # Typprüfung DataFrame
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError("Das übergebene Objekt ('df') ist kein gültiger pandas.DataFrame.")
+        
+        # Prüfung auf leeren DataFrame
+        if df.empty:
+            raise ValueError("Der DataFrame ist leer und kann nicht exportiert werden.")
+        
+        # Dateiendung prüfen
         if not filename.endswith('.xlsx'):
             raise ValueError(f"Die Datei '{filename}' hat keine '.xlsx'-Endung.")
-        df_reset = df.reset_index()
-        df_reset.to_excel(filename, index=False)
+        
+        # Verzeichnis erstellen falls nicht vorhanden
+        dir_name = os.path.dirname(filename)
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name, exist_ok=True)
+            screen_and_log(f"Info: Verzeichnis '{dir_name}' wurde erstellt.", logfile, screen)
+        
+        # DataFrame exportieren (ohne unnötigen reset_index)
+        df.to_excel(filename, sheet_name=sheet_name, index=False)
         screen_and_log(f"Info: DataFrame erfolgreich in '{filename}' exportiert.", logfile, screen)
+        return True
+        
+    except FileNotFoundError as e:
+        screen_and_log(f"ERROR: Datei oder Verzeichnis nicht gefunden: {e}", logfile, screen)
+        return False
+    except PermissionError:
+        screen_and_log(f"ERROR: Keine Schreibberechtigung für die Datei '{filename}'.", logfile, screen)
+        return False
+    except ValueError as e:
+        screen_and_log(f"ERROR: Ungültige Eingabe: {e}", logfile, screen)
+        return False
     except Exception as e:
         screen_and_log(f"ERROR: Fehler beim Exportieren des DataFrames in '{filename}': {e}", logfile, screen)
+        return False
 
 # -------------------------------
 # Exportiert einen 2D Datafram mit Multiindex in eine Pivot-artige EXCEL Tablle 
 # -------------------------------
-def export_2D_df_to_excel_pivot(df, filename, logfile=None, screen=True):
+def export_2D_df_to_excel_pivot(df, filename, sheet_name='Sheet1', logfile=None, screen=True):
     """
     Exportiert den übergebenen DataFrame in eine Pivot-Darstellung als Excel-Datei.
     Zeilen enthalten die erste Indexebene, Spalten die zweite Indexebene und die Zellen den Wert.
@@ -68,11 +127,12 @@ def export_2D_df_to_excel_pivot(df, filename, logfile=None, screen=True):
     Parameter:
         df (DataFrame): Der zu exportierende DataFrame (MultiIndex erwartet).
         filename (str): Der Pfad und Name der Datei, in die der DataFrame exportiert werden soll.
+        sheet_name (str): Name des Arbeitsblatts (Standard: 'Sheet1').
         logfile (str, optional): Der Pfad zum Logfile. Wenn None, wird keine Protokollierung ins Logfile durchgeführt.
         screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden.
 
     Rückgabe:
-        None
+        bool: True bei erfolgreichem Export, False bei Fehler.
 
     Hinweise:
         - Der DataFrame muss mindestens zwei Indexebenen enthalten.
@@ -98,37 +158,57 @@ def export_2D_df_to_excel_pivot(df, filename, logfile=None, screen=True):
         if dir_name and not os.path.exists(dir_name):
             raise FileNotFoundError(f"Das Verzeichnis '{dir_name}' existiert nicht.")
 
+        # Prüfung auf leeren DataFrame
+        if df.empty:
+            raise ValueError("Der DataFrame ist leer und kann nicht exportiert werden.")
+
         # Überprüfen, ob der DataFrame mindestens zwei Indexebenen hat
         if df.index.nlevels < 2:
             raise ValueError("Der DataFrame benötigt mindestens zwei Indexebenen für die Pivot-Darstellung.")
 
         # Versuch, die Pivot-Darstellung zu erstellen und zu exportieren
         df_pivot = df.unstack(level=-1)
-        df_pivot.to_excel(filename)
+        df_pivot.to_excel(filename, sheet_name=sheet_name)
 
         screen_and_log(
             f"Info: Pivot-Darstellung des DataFrames erfolgreich in '{filename}' exportiert.",
             logfile,
             screen=screen            
         )
+        return True
+        
     except FileNotFoundError as e:
         screen_and_log(f"ERROR: Datei oder Verzeichnis nicht gefunden: {e}", logfile, screen)
+        return False
     except PermissionError:
         screen_and_log(f"ERROR: Keine Schreibberechtigung für die Datei '{filename}'.", logfile, screen)
+        return False
     except ValueError as e:
         screen_and_log(f"ERROR: Ungültiger DataFrame oder Dateiname: {e}", logfile, screen)
+        return False
     except Exception as e:
         screen_and_log(f"ERROR: Fehler beim Exportieren der Pivot-Darstellung: {e}", logfile, screen)
+        return False
 
 # -------------------------------
 # Exportiert einen 2D Datafram mit Multiindex in eine Pivot-artige EXCEL Tablle, die Tabelle ist so strukturiert, dass sie eindeutige Zeilen- und Spaltenbeschriftungen hat 
 #   das erlaubt das spätere Formatieren als Tabelle (ersetzt die Funktion "export_2D_df_to_excel_pivot")
 # -------------------------------
-def export_2D_df_to_excel_clean_table(df, filename, logfile=None, screen=True):
+def export_2D_df_to_excel_clean_table(df, filename, sheet_name='Sheet1', logfile=None, screen=True):
     """
     Exportiert einen 2D-MultiIndex-DataFrame in eine flache Excel-Tabelle.
     Die Zelle A1 enthält den Namen der ersten Indexebene.
     Die Spaltenüberschriften basieren nur auf der zweiten Indexebene.
+    
+    Parameter:
+        df (DataFrame): Der zu exportierende DataFrame (MultiIndex erwartet).
+        filename (str): Der Pfad und Name der Datei.
+        sheet_name (str): Name des Arbeitsblatts (Standard: 'Sheet1').
+        logfile (str, optional): Der Pfad zum Logfile.
+        screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden.
+        
+    Rückgabe:
+        bool: True bei erfolgreichem Export, False bei Fehler.
     """
     try:
         # Typprüfung
@@ -143,6 +223,10 @@ def export_2D_df_to_excel_clean_table(df, filename, logfile=None, screen=True):
         dir_name = os.path.dirname(filename)
         if dir_name and not os.path.exists(dir_name):
             raise FileNotFoundError(f"Das Verzeichnis '{dir_name}' existiert nicht.")
+        # Prüfung auf leeren DataFrame
+        if df.empty:
+            raise ValueError("Der DataFrame ist leer und kann nicht exportiert werden.")
+            
         if df.index.nlevels != 2:
             raise ValueError("Der DataFrame muss genau zwei Indexebenen enthalten.")
 
@@ -159,22 +243,27 @@ def export_2D_df_to_excel_clean_table(df, filename, logfile=None, screen=True):
         df_clean.rename(columns={df_clean.columns[0]: index_name}, inplace=True)
 
         # Exportieren
-        df_clean.to_excel(filename, index=False)
+        df_clean.to_excel(filename, sheet_name=sheet_name, index=False)
 
         screen_and_log(
             f"Info: Tabelle erfolgreich als '{filename}' exportiert.",
             logfile,
             screen=screen
         )
+        return True
 
     except FileNotFoundError as e:
         screen_and_log(f"ERROR: Datei oder Verzeichnis nicht gefunden: {e}", logfile, screen)
+        return False
     except PermissionError:
         screen_and_log(f"ERROR: Keine Schreibberechtigung für die Datei '{filename}'.", logfile, screen)
+        return False
     except ValueError as e:
         screen_and_log(f"ERROR: Ungültige Eingabe: {e}", logfile, screen)
+        return False
     except Exception as e:
         screen_and_log(f"ERROR: Fehler beim Exportieren der Tabelle: {e}", logfile, screen)
+        return False
 
 
 
@@ -194,8 +283,24 @@ def files_availability_check(file_list, logfile=None, screen=True):
     Rückgabe:
         bool: True, wenn alle Dateien verfügbar sind, False sonst.
     """
+    # Input validation
+    if not isinstance(file_list, (list, tuple)):
+        raise ValueError("file_list muss eine Liste oder Tuple von Dateipfaden sein.")
+    
+    # Handle empty list
+    if not file_list:
+        screen_and_log("Info: Keine Dateien zur Prüfung angegeben.", logfile, screen)
+        return True
+    
     all_available = True
+    available_count = 0
+    
     for file_path in file_list:
+        if not isinstance(file_path, str):
+            screen_and_log(f"ERROR: Ungültiger Dateipfad: {file_path} (muss String sein).", logfile, screen)
+            all_available = False
+            continue
+            
         if not os.path.isfile(file_path):
             screen_and_log(f"ERROR: Datei '{file_path}' nicht gefunden.", logfile, screen)
             all_available = False
@@ -204,6 +309,12 @@ def files_availability_check(file_list, logfile=None, screen=True):
             all_available = False
         else:
             screen_and_log(f"Info: Datei '{file_path}' ist verfügbar.", logfile, screen)
+            available_count += 1
+    
+    # Summary logging
+    total_files = len(file_list)
+    screen_and_log(f"Info: Verfügbarkeitscheck abgeschlossen: {available_count}/{total_files} Dateien verfügbar.", logfile, screen)
+    
     return all_available
 
 # ------------------------------------------------------------------------------
@@ -223,24 +334,59 @@ def format_excel_as_table_with_freeze(filename, table_name="Table1", style_name=
         screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden.
         
     Rückgabe:
-        None
+        bool: True bei erfolgreichem Formatieren, False bei Fehler.
     """
     try:
+        # Input validation
+        if not isinstance(filename, str):
+            raise ValueError("Der Dateiname ('filename') muss ein String sein.")
+        if not isinstance(table_name, str):
+            raise ValueError("Der Tabellenname ('table_name') muss ein String sein.")
+        if not isinstance(style_name, str):
+            raise ValueError("Der Stilname ('style_name') muss ein String sein.")
+        if not isinstance(freeze_first_row, bool):
+            raise ValueError("Der Parameter ('freeze_first_row') muss ein Boolean sein.")
+            
         if not os.path.isfile(filename):
             raise FileNotFoundError(f"Die Datei '{filename}' wurde nicht gefunden.")
+            
         workbook = load_workbook(filename)
         sheet = workbook.active
+        
+        # Check if sheet has data
+        if sheet.max_row == 1 and sheet.max_column == 1 and sheet['A1'].value is None:
+            raise ValueError("Das Arbeitsblatt ist leer und kann nicht als Tabelle formatiert werden.")
+        
+        # Check if table name already exists
+        existing_tables = [table.name for table in sheet._tables]
+        if table_name in existing_tables:
+            raise ValueError(f"Eine Tabelle mit dem Namen '{table_name}' existiert bereits.")
+            
         table_ref = f"A1:{sheet.cell(sheet.max_row, sheet.max_column).coordinate}"
         table = Table(displayName=table_name, ref=table_ref)
         table.tableStyleInfo = TableStyleInfo(name=style_name, showFirstColumn=False, 
                                               showLastColumn=False, showRowStripes=True, showColumnStripes=False)
         sheet.add_table(table)
+        
         if freeze_first_row:
             sheet.freeze_panes = "A2"
+            
         workbook.save(filename)
         screen_and_log(f"Info: Datei '{filename}' erfolgreich als Tabelle formatiert.", logfile, screen)
+        return True
+        
+    except FileNotFoundError as e:
+        screen_and_log(f"ERROR: Datei nicht gefunden: {e}", logfile, screen)
+        return False
+    except PermissionError:
+        screen_and_log(f"ERROR: Keine Schreibberechtigung für die Datei '{filename}'.", logfile, screen)
+        return False
+    except ValueError as e:
+        screen_and_log(f"ERROR: Ungültige Eingabe: {e}", logfile, screen)
+        return False
     except Exception as e:
         screen_and_log(f"ERROR: Fehler beim Formatieren der Datei '{filename}': {e}", logfile, screen)
+        return False
 
 # -------------------------------
 # Formatiert Zellen und Spaltenbreite einer existierenden EXCEL Datei
@@ -259,6 +405,9 @@ def format_excel_columns(filename, column_formats, column_widths=None, logfile=N
                                         wird die letzte Breite wiederverwendet.
         logfile (str, optional): Optionaler Pfad zu einer Logdatei.
         screen (bool): Statusausgabe auf dem Bildschirm.
+        
+    Rückgabe:
+        bool: True bei erfolgreichem Formatieren, False bei Fehler.
     """
 
     try:
@@ -296,13 +445,20 @@ def format_excel_columns(filename, column_formats, column_widths=None, logfile=N
 
         workbook.save(filename)
         screen_and_log(f"Info: Datei '{filename}' wurde erfolgreich formatiert und angepasst.", logfile, screen)
+        return True
 
     except FileNotFoundError as e:
         screen_and_log(f"ERROR: Datei '{filename}' wurde nicht gefunden: {e}", logfile, screen)
+        return False
+    except PermissionError:
+        screen_and_log(f"ERROR: Keine Schreibberechtigung für die Datei '{filename}'.", logfile, screen)
+        return False
     except ValueError as e:
         screen_and_log(f"ERROR: Ungültige Parameter: {e}", logfile, screen)
+        return False
     except Exception as e:
         screen_and_log(f"ERROR: Fehler beim Formatieren der Datei '{filename}': {e}", logfile, screen)
+        return False
 
 
 
@@ -367,16 +523,17 @@ def is_file_open_windows(file_path):
 # -------------------------------
 # Zentralisierte Protokollierung
 # -------------------------------
-def screen_and_log(message, logfile=None, screen=True):
+def screen_and_log(message, logfile=None, screen=True, auto_log=False):
     """
     Gibt die Nachricht auf dem Bildschirm aus (je nach Bedingungen) und schreibt sie optional in ein Logfile.
 
-    Letzte Änderung: 28.11.24
+    Letzte Änderung: 03.01.25
 
     Parameter:
         message (str): Die Nachricht, die verarbeitet werden soll.
-        logfile (str, optional): Der Pfad zum Logfile. Wenn nicht angegeben, wird nur die Bildschirm-Ausgabe verwendet.
+        logfile (str, optional): Der Pfad zum Logfile. Wenn None und auto_log=True, wird automatisch 'scriptname.log' verwendet.
         screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden sollen.
+        auto_log (bool): Wenn True und logfile=None, wird automatisch ein Logfile basierend auf dem Skriptnamen erstellt.
 
     Rückgabe:
         str: Die formatierte Nachricht (nützlich für Tests).
@@ -385,6 +542,21 @@ def screen_and_log(message, logfile=None, screen=True):
         raise ValueError("Die Nachricht ('message') muss ein String sein.")
     if logfile is not None and not isinstance(logfile, str):
         raise ValueError("Der Logfile-Pfad ('logfile') muss ein String sein, wenn angegeben.")
+    
+    # Auto-Logfile erstellen wenn gewünscht und kein Logfile angegeben
+    if logfile is None and auto_log:
+        # Ermittle den Namen des ursprünglichen Skripts (nicht dieser Bibliothek)
+        stack = inspect.stack()
+        script_filename = None
+        for frame_info in reversed(stack):  # Von außen nach innen suchen
+            filename = frame_info.filename
+            if not filename.endswith('Standardfunktionen_aktuell.py'):
+                script_filename = filename
+                break
+        
+        if script_filename:
+            script_name = os.path.splitext(os.path.basename(script_filename))[0]
+            logfile = f"{script_name}.log"
     
     # Funktionsname des Aufrufers ermitteln
     caller_function = inspect.stack()[1].function
@@ -488,6 +660,10 @@ def settings_import(file_name):
     """
     
     try:
+        # Input validation
+        if not isinstance(file_name, str):
+            raise ValueError("Der Dateiname ('file_name') muss ein String sein.")
+            
         # Prüfe, ob die Datei existiert
         if not os.path.isfile(file_name):
             raise FileNotFoundError(f"Die Datei '{file_name}' wurde nicht gefunden.")
@@ -515,7 +691,8 @@ def settings_import(file_name):
                         continue  # Weiter zum nächsten Eintrag
                     except Exception as e:
                         # Parsing fehlgeschlagen → als Fallback weitermachen
-                        print(f"WARNING: Kann Wert für '{section}:{key}' nicht als Dictionary parsen: {e}")
+                        screen_and_log(f"WARNING: Kann Wert für '{section}:{key}' nicht als Dictionary parsen: {e}", 
+                                     logfile, screen, auto_log=True)
 
                 # Bool-Werte erkennen und umwandeln
                 if value.lower() in ['true', 'false']:
@@ -534,5 +711,5 @@ def settings_import(file_name):
 
     except Exception as e:
         # Allgemeine Fehlerbehandlung (z. B. Datei beschädigt)
-        print(f"ERROR: Fehler beim Laden der Einstellungen: {e}")
+        screen_and_log(f"ERROR: Fehler beim Laden der Einstellungen: {e}", logfile, screen, auto_log=True)
         return None

@@ -1,5 +1,7 @@
 # Standardfunktionen_aktuell.py - Dokumentation
 
+> **📋 Change History**: For recent improvements, breaking changes, and migration guides, see [CHANGELOG.md](CHANGELOG.md)
+
 ## Überblick
 Diese Datei enthält eine Sammlung von Standardfunktionen für die Arbeit mit DataFrames, Excel-Dateien und Systemoperationen in Python. Die Bibliothek bietet umfassende Funktionalitäten für Export, Import und Formatierung von Daten.
 

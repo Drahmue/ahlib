@@ -200,6 +200,7 @@ Temporary Items
 *.log
 *.ini
 *.txt
+!requirements.txt
 *.docx
 *Dummy*
 *dummy*
