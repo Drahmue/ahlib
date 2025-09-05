@@ -98,8 +98,14 @@ def export_df_to_excel(df, filename, sheet_name='Sheet1', logfile=None, screen=T
             os.makedirs(dir_name, exist_ok=True)
             screen_and_log(f"Info: Verzeichnis '{dir_name}' wurde erstellt.", logfile, screen)
         
-        # DataFrame exportieren (ohne unnötigen reset_index)
-        df.to_excel(filename, sheet_name=sheet_name, index=False)
+        # DataFrame exportieren - prüfe ob Index als Spalte benötigt wird
+        if df.index.name or (hasattr(df.index, 'names') and any(df.index.names)):
+            # Index hat einen Namen (z.B. 'date') -> als Spalte exportieren
+            df_export = df.reset_index()
+            df_export.to_excel(filename, sheet_name=sheet_name, index=False)
+        else:
+            # Index ist Standard-Index -> ohne Index exportieren
+            df.to_excel(filename, sheet_name=sheet_name, index=False)
         screen_and_log(f"Info: DataFrame erfolgreich in '{filename}' exportiert.", logfile, screen)
         return True
         
