@@ -3,6 +3,7 @@ import pandas as pd
 import msvcrt
 from datetime import datetime
 import inspect
+from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
 import configparser
@@ -692,13 +693,20 @@ def settings_import(file_name):
                 # Versuche, strukturierte Werte (Dictionaries, Listen etc.) als Python-Objekt zu parsen
                 if value.startswith("{") and value.endswith("}"):
                     try:
-                        parsed = ast.literal_eval(value)  # Sicheres Parsen von Python-Datentypen
+                        # Convert JSON-style boolean literals to Python literals for ast.literal_eval
+                        python_value = value.replace(' true', ' True').replace(' false', ' False')
+                        python_value = python_value.replace(':true', ':True').replace(':false', ':False')
+                        python_value = python_value.replace('[true', '[True').replace('[false', '[False')
+                        python_value = python_value.replace(',true', ',True').replace(',false', ',False')
+                        python_value = python_value.replace('{true', '{True').replace('{false', '{False')
+
+                        parsed = ast.literal_eval(python_value)  # Sicheres Parsen von Python-Datentypen
                         settings[section][key] = parsed   # Im Dictionary speichern
                         continue  # Weiter zum nächsten Eintrag
                     except Exception as e:
                         # Parsing fehlgeschlagen → als Fallback weitermachen
-                        screen_and_log(f"WARNING: Kann Wert für '{section}:{key}' nicht als Dictionary parsen: {e}", 
-                                     logfile, screen, auto_log=True)
+                        screen_and_log(f"WARNING: Kann Wert für '{section}:{key}' nicht als Dictionary parsen: {e}",
+                                     None, True, auto_log=True)
 
                 # Bool-Werte erkennen und umwandeln
                 if value.lower() in ['true', 'false']:
@@ -717,5 +725,274 @@ def settings_import(file_name):
 
     except Exception as e:
         # Allgemeine Fehlerbehandlung (z. B. Datei beschädigt)
-        screen_and_log(f"ERROR: Fehler beim Laden der Einstellungen: {e}", logfile, screen, auto_log=True)
+        screen_and_log(f"ERROR: Fehler beim Laden der Einstellungen: {e}", None, True, auto_log=True)
         return None
+
+# -------------------------------
+# Enhanced ConfigParser with Structured Data Support
+# -------------------------------
+class StructuredConfigParser(configparser.ConfigParser):
+    """
+    Enhanced ConfigParser with automatic type conversion and settings_import compatibility.
+
+    Features:
+    - All standard ConfigParser methods work unchanged
+    - Automatic type conversion (bool, int, float, list, dict)
+    - settings_import() style dict export with to_dict()
+    - Structured data support like {"key": "value"} in INI files
+    - Same parsing logic as settings_import() function
+
+    Usage:
+        config = StructuredConfigParser()
+        config.read('config.ini')
+
+        # Traditional access (unchanged)
+        value = config.get('Section', 'key', fallback='default')
+
+        # Enhanced access with type conversion
+        typed_value = config.get_structured('Section', 'key', fallback=default)
+
+        # Export as dict (like settings_import)
+        settings_dict = config.to_dict()
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize with interpolation disabled (like settings_import)."""
+        kwargs.setdefault('interpolation', None)
+        super().__init__(*args, **kwargs)
+
+    def get_structured(self, section, option, fallback=None):
+        """
+        Get configuration value with automatic type conversion.
+
+        Uses same parsing logic as settings_import() function.
+
+        Args:
+            section (str): Section name in INI file
+            option (str): Option name in section
+            fallback: Default value if option not found
+
+        Returns:
+            Parsed value with appropriate Python type (dict, list, bool, int, float, str)
+        """
+        try:
+            value = self.get(section, option).strip()
+            return self._parse_value(value)
+        except (configparser.NoSectionError, configparser.NoOptionError):
+            return fallback
+
+    def _parse_value(self, value):
+        """
+        Parse string value to appropriate Python type.
+
+        Uses identical logic to settings_import() function for consistency.
+
+        Args:
+            value (str): Raw string value from INI file
+
+        Returns:
+            Parsed value (dict, list, bool, int, float, or str)
+        """
+        # Try structured data (dict/list/tuple) - same as settings_import
+        if ((value.startswith("{") and value.endswith("}")) or
+            (value.startswith("[") and value.endswith("]")) or
+            (value.startswith("(") and value.endswith(")"))):
+            try:
+                # Convert JSON-style boolean literals to Python literals for ast.literal_eval
+                python_value = value.replace(' true', ' True').replace(' false', ' False')
+                python_value = python_value.replace(':true', ':True').replace(':false', ':False')
+                python_value = python_value.replace('[true', '[True').replace('[false', '[False')
+                python_value = python_value.replace(',true', ',True').replace(',false', ',False')
+                python_value = python_value.replace('{true', '{True').replace('{false', '{False')
+
+                parsed = ast.literal_eval(python_value)  # Same as settings_import
+                return parsed
+            except Exception:
+                # Parsing failed → continue with other patterns
+                pass
+
+        # Bool-Werte erkennen und umwandeln - same as settings_import
+        if value.lower() in ['true', 'false']:
+            return value.lower() == 'true'
+
+        # Ganzzahl oder Kommazahl erkennen - same as settings_import
+        elif value.replace('.', '', 1).isdigit():
+            return float(value) if '.' in value else int(value)
+
+        # Kommagetrennte Liste → z. B. "A,B,C" - same as settings_import
+        # But skip if it looks like it might be structured data that failed to parse
+        elif ',' in value and not ('{' in value or '[' in value or '(' in value):
+            return [v.strip() for v in value.split(',')]
+
+        else:
+            # Fallback: einfacher String - same as settings_import
+            return value
+
+    def to_dict(self):
+        """
+        Export entire configuration as nested dictionary.
+
+        Returns same format as settings_import() function:
+        {
+            "Section1": {"key1": parsed_value1, "key2": parsed_value2},
+            "Section2": {"key3": parsed_value3}
+        }
+
+        Returns:
+            dict: Nested dictionary with parsed values
+        """
+        settings = {}
+        for section_name in self.sections():
+            settings[section_name] = {}
+            for key, value in self.items(section_name):
+                settings[section_name][key] = self._parse_value(value)
+        return settings
+
+    def get_section_dict(self, section):
+        """
+        Get entire section as dictionary with parsed values.
+
+        Args:
+            section (str): Section name
+
+        Returns:
+            dict: All keys in section with parsed values, empty dict if section not found
+        """
+        if not self.has_section(section):
+            return {}
+
+        section_dict = {}
+        for key, value in self.items(section):
+            section_dict[key] = self._parse_value(value)
+        return section_dict
+
+def load_structured_config(file_name, logfile=None, screen=True):
+    """
+    Load INI file with structured data support and comprehensive error handling.
+
+    Enhanced version of settings_import() that returns StructuredConfigParser object
+    instead of dict, allowing both traditional ConfigParser usage and structured data access.
+
+    Args:
+        file_name (str): Path to INI configuration file
+        logfile (str, optional): Path to log file for error logging
+        screen (bool): Whether to show messages on screen
+
+    Returns:
+        StructuredConfigParser: Enhanced config parser with type conversion
+        None: If loading failed (with error logged)
+
+    Raises:
+        ValueError: If file_name is not a string
+        FileNotFoundError: If configuration file not found
+
+    Usage:
+        # Method 1: Use as enhanced ConfigParser
+        config = load_structured_config("config.ini")
+        if config:
+            value = config.get_structured("Section", "key", default_value)
+            section_data = config.get_section_dict("Section")
+
+        # Method 2: Export as dict (like settings_import)
+        config = load_structured_config("config.ini")
+        if config:
+            settings = config.to_dict()  # Same format as settings_import()
+    """
+    try:
+        # Input validation (same as settings_import)
+        if not isinstance(file_name, str):
+            raise ValueError("Der Dateiname ('file_name') muss ein String sein.")
+
+        # Check if file exists (same as settings_import)
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError(f"Die Datei '{file_name}' wurde nicht gefunden.")
+
+        # Load INI file with structured parser
+        config = StructuredConfigParser()
+        config.read(file_name, encoding='utf-8')  # Use UTF-8 for better compatibility
+
+        screen_and_log(f"Info: Konfigurationsdatei '{file_name}' erfolgreich geladen.", logfile, screen)
+        return config
+
+    except Exception as e:
+        # Same error handling as settings_import
+        screen_and_log(f"ERROR: Fehler beim Laden der Konfiguration: {e}", logfile, screen, auto_log=True)
+        return None
+
+def settings_import_structured(file_name, logfile=None, screen=True):
+    """
+    Enhanced version of settings_import() returning StructuredConfigParser.
+
+    Provides both dict export (backwards compatible) and ConfigParser object access.
+
+    Args:
+        file_name (str): Path to INI configuration file
+        logfile (str, optional): Path to log file
+        screen (bool): Whether to show messages on screen
+
+    Returns:
+        StructuredConfigParser or None: Enhanced config parser or None if failed
+
+    Usage:
+        # Backwards compatible with settings_import
+        config = settings_import_structured("config.ini")
+        if config:
+            settings = config.to_dict()  # Same as original settings_import()
+
+        # Plus enhanced ConfigParser features
+        if config:
+            value = config.get_structured("Section", "key", fallback)
+    """
+    return load_structured_config(file_name, logfile, screen)
+
+def load_structured_config_with_validation(file_name, validation_error_class=None):
+    """
+    Load INI file with structured data support for account statements scripts.
+
+    This function is specifically designed for account statements scripts that use
+    ValidationError for error handling instead of returning None.
+
+    Args:
+        file_name (str): Path to INI configuration file
+        validation_error_class: ValidationError class to use for exceptions
+                               (defaults to creating a simple Exception subclass)
+
+    Returns:
+        StructuredConfigParser: Enhanced config parser with type conversion
+
+    Raises:
+        ValidationError: If file not found or cannot be read
+
+    Usage:
+        # In account statements scripts
+        try:
+            from core.types import ValidationError
+        except ImportError:
+            class ValidationError(Exception):
+                pass
+
+        config = load_structured_config_with_validation("as.ini", ValidationError)
+        value = config.get_structured("Section", "key", default)
+    """
+    # Create default ValidationError if none provided
+    if validation_error_class is None:
+        class ValidationError(Exception):
+            pass
+        validation_error_class = ValidationError
+
+    # Input validation
+    if not isinstance(file_name, str):
+        raise validation_error_class("Der Dateiname ('file_name') muss ein String sein.")
+
+    file_path = Path(file_name)
+    if not file_path.exists():
+        raise validation_error_class(f"Configuration file not found: {file_path}")
+
+    # Load with structured parser
+    config = StructuredConfigParser()
+    try:
+        config.read(file_path, encoding='utf-8')
+    except Exception as e:
+        raise validation_error_class(f"Error reading configuration file: {e}")
+
+    return config
