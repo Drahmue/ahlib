@@ -5,7 +5,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="Standardbibliothek",
+    name="ahlib",
     version="1.0.0",
     author="Account Statements Team",
     description="Standard library for DataFrame operations, Excel file handling, and system utilities",

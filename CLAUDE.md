@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python utility library called "Standardbibliothek" containing standardized functions for DataFrame operations, Excel file handling, and system utilities. The main module is `Standardfunktionen_aktuell.py`, which provides a comprehensive set of functions for data export, import, and file operations optimized for Windows environments.
+This is a Python utility library called "ahlib" containing standardized functions for DataFrame operations, Excel file handling, and system utilities. The main module is `ahlib.py`, which provides a comprehensive set of functions for data export, import, and file operations optimized for Windows environments.
 
 ## Development Environment
 
@@ -15,7 +15,7 @@ This is a Python utility library called "Standardbibliothek" containing standard
 
 ## Core Architecture
 
-### Main Module: `Standardfunktionen_aktuell.py`
+### Main Module: `ahlib.py`
 
 The library is organized into five functional categories:
 
@@ -58,7 +58,7 @@ No formal test framework is configured. To test functions:
 
 ```python
 # Import the library
-from Standardfunktionen_aktuell import *
+from ahlib import *
 
 # Test basic functionality
 import pandas as pd
