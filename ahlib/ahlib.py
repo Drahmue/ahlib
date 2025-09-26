@@ -437,20 +437,20 @@ def format_excel_columns(filename, column_formats, logger, column_widths=None):
                 sheet.column_dimensions[col_letter].width = column_widths[width_index]
 
         workbook.save(filename)
-        screen_and_log(f"Info: Datei '{filename}' wurde erfolgreich formatiert und angepasst.", logfile, screen)
+        logger.info(f"Datei '{filename}' wurde erfolgreich formatiert und angepasst.")
         return True
 
     except FileNotFoundError as e:
-        screen_and_log(f"ERROR: Datei '{filename}' wurde nicht gefunden: {e}", logfile, screen)
+        logger.error(f"Datei '{filename}' wurde nicht gefunden: {e}")
         return False
     except PermissionError:
-logger.error(f"Keine Schreibberechtigung für die Datei '{filename}'.")
+        logger.error(f"Keine Schreibberechtigung für die Datei '{filename}'.")
         return False
     except ValueError as e:
-        screen_and_log(f"ERROR: Ungültige Parameter: {e}", logfile, screen)
+        logger.error(f"Ungültige Parameter: {e}")
         return False
     except Exception as e:
-        screen_and_log(f"ERROR: Fehler beim Formatieren der Datei '{filename}': {e}", logfile, screen)
+        logger.error(f"Fehler beim Formatieren der Datei '{filename}': {e}")
         return False
 
 
@@ -458,14 +458,13 @@ logger.error(f"Keine Schreibberechtigung für die Datei '{filename}'.")
 # --------------------------
 # Parquet-Dateien importieren
 # --------------------------
-def import_parquet(filename, logfile=None, screen=True):
+def import_parquet(filename, logger):
     """
     Liest eine Parquet-Datei ein und gibt einen DataFrame zurück.
 
     Parameter:
         filename (str): Pfad zur Parquet-Datei.
-        logfile (str, optional): Der Pfad zum Logfile.
-        screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden.
+        logger (ExtendedLogger): Logger-Instanz für strukturierte Protokollierung.
         
     Rückgabe:
         pandas.DataFrame | None: Der DataFrame oder None bei Fehlern.
@@ -476,10 +475,10 @@ def import_parquet(filename, logfile=None, screen=True):
         if not os.path.isfile(filename):
             raise FileNotFoundError(f"Die Datei '{filename}' wurde nicht gefunden.")
         df = pd.read_parquet(filename)
-        screen_and_log(f"Info: Parquet-Datei '{filename}' erfolgreich eingelesen.", logfile, screen)
+        logger.info(f"Parquet-Datei '{filename}' erfolgreich eingelesen.")
         return df
     except Exception as e:
-        screen_and_log(f"ERROR: Fehler beim Importieren der Datei '{filename}': {e}", logfile, screen)
+        logger.error(f"Fehler beim Importieren der Datei '{filename}': {e}")
         return None
 
 # ----------------------------------------------
@@ -516,86 +515,20 @@ def is_file_open_windows(file_path):
 # -------------------------------
 # Zentralisierte Protokollierung
 # -------------------------------
-def screen_and_log(message, logfile=None, screen=True, auto_log=False):
-    """
-    Gibt die Nachricht auf dem Bildschirm aus (je nach Bedingungen) und schreibt sie optional in ein Logfile.
-
-    Letzte Änderung: 03.01.25
-
-    Parameter:
-        message (str): Die Nachricht, die verarbeitet werden soll.
-        logfile (str, optional): Der Pfad zum Logfile. Wenn None und auto_log=True, wird automatisch 'scriptname.log' verwendet.
-        screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden sollen.
-        auto_log (bool): Wenn True und logfile=None, wird automatisch ein Logfile basierend auf dem Skriptnamen erstellt.
-
-    Rückgabe:
-        str: Die formatierte Nachricht (nützlich für Tests).
-    """
-    if not isinstance(message, str):
-        raise ValueError("Die Nachricht ('message') muss ein String sein.")
-    if logfile is not None and not isinstance(logfile, str):
-        raise ValueError("Der Logfile-Pfad ('logfile') muss ein String sein, wenn angegeben.")
-    
-    # Auto-Logfile erstellen wenn gewünscht und kein Logfile angegeben
-    if logfile is None and auto_log:
-        # Ermittle den Namen des ursprünglichen Skripts (nicht dieser Bibliothek)
-        stack = inspect.stack()
-        script_filename = None
-        for frame_info in reversed(stack):  # Von außen nach innen suchen
-            filename = frame_info.filename
-            if not filename.endswith('Standardfunktionen_aktuell.py'):
-                script_filename = filename
-                break
-        
-        if script_filename:
-            script_name = os.path.splitext(os.path.basename(script_filename))[0]
-            logfile = f"{script_name}.log"
-    
-    # Funktionsname des Aufrufers ermitteln
-    caller_function = inspect.stack()[1].function
-    
-    # Zeitstempel ergänzen
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Nachricht formatieren
-    formatted_message = f"{current_time} - {message} (Caller Funktion: {caller_function})"
-
-    # Bildschirm-Ausgabe steuern
-    if message.strip().upper().startswith(("ERROR", "WARNING")):
-        # Fall 1: Immer formatierte Nachricht anzeigen (formatierte Ausgabe)
-        print(formatted_message)
-    elif screen is True:
-        # Fall 2a: Originale Nachricht anzeigen, wenn `screen=True`
-        print(message)
-    # Fall 2b: Keine Anzeige, screen=False und keine "ERROR"/"WARNING"
-
-
-    # Nachricht ins Logfile schreiben, falls ein Logfile angegeben ist
-    if logfile:
-        try:
-            log_dir = os.path.dirname(logfile) or os.getcwd()
-            os.makedirs(log_dir, exist_ok=True)  # Verzeichnis erstellen, falls es nicht existiert
-            with open(logfile, 'a', encoding='utf-8') as log_file:
-                log_file.write(formatted_message + "\n")
-        except Exception as e:
-            print(f"ERROR: Konnte nicht ins Logfile '{logfile}' schreiben: {e}")
-    
-    return formatted_message  # Optional: Rückgabe für Tests
 
 # -------------------------------
 # Arbeitsverzeichnis setzen
 # -------------------------------
-def set_working_directory(path="default", logfile=None, screen=True):
+def set_working_directory(path, logger):
     """
     Setzt das aktuelle Arbeitsverzeichnis.
 
     Parameter:
-        path (str): 
-            - Wenn "default", wird das Arbeitsverzeichnis auf das Verzeichnis gesetzt, 
+        path (str):
+            - Wenn "default", wird das Arbeitsverzeichnis auf das Verzeichnis gesetzt,
               von dem aus das Skript gestartet wurde.
             - Andernfalls wird der übergebene Pfad als Arbeitsverzeichnis verwendet.
-        logfile (str, optional): Der Pfad zum Logfile. Wenn None, wird keine Protokollierung ins Logfile durchgeführt.
-        screen (bool): Ob Nachrichten auf dem Bildschirm angezeigt werden.
+        logger (ExtendedLogger): Logger-Instanz für strukturierte Protokollierung.
         
     Rückgabe:
         None
@@ -616,21 +549,21 @@ def set_working_directory(path="default", logfile=None, screen=True):
             caller_filename = caller_frame.filename
             caller_directory = os.path.dirname(os.path.abspath(caller_filename))
             os.chdir(caller_directory)
-            screen_and_log(f"Info: Arbeitsverzeichnis wurde auf das Verzeichnis des Callers gesetzt: {caller_directory}", logfile, screen)
+            logger.info(f"Arbeitsverzeichnis wurde auf das Verzeichnis des Callers gesetzt: {caller_directory}")
         else:
             # Prüft, ob der angegebene Pfad existiert und ein Verzeichnis ist
             if os.path.exists(path) and os.path.isdir(path):
                 os.chdir(path)
-                screen_and_log(f"Info: Arbeitsverzeichnis wurde auf '{path}' gesetzt.", logfile, screen)
+                logger.info(f"Arbeitsverzeichnis wurde auf '{path}' gesetzt.")
             else:
                 raise FileNotFoundError(f"Der Pfad '{path}' ist nicht verfügbar oder kein gültiges Verzeichnis.")
 
     except PermissionError:
-        screen_and_log(f"ERROR: Keine Berechtigung, das Arbeitsverzeichnis auf '{path}' zu setzen.", logfile, screen)
+        logger.error(f"Keine Berechtigung, das Arbeitsverzeichnis auf '{path}' zu setzen.")
     except FileNotFoundError as e:
-        screen_and_log(f"ERROR: Der angegebene Pfad ist ungültig: {e}", logfile, screen)
+        logger.error(f"Der angegebene Pfad ist ungültig: {e}")
     except Exception as e:
-        screen_and_log(f"ERROR: Ein unerwarteter Fehler ist aufgetreten: {e}", logfile, screen)
+        logger.error(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
 
 # -------------------------------
 # Einstellungen aus INI-Datei laden
@@ -639,7 +572,7 @@ import os
 import configparser
 import ast  # Ermöglicht sicheres Parsen von Python-Literalen (z. B. dict, list, int)
 
-def settings_import(file_name):
+def settings_import(file_name, logger):
     """
     Liest eine INI-Datei ein und gibt die Inhalte als Dictionary zurück.
     Unterstützt strukturierte Werte wie Dictionaries in einer Zeile (z. B. für Export-Optionen).
@@ -691,8 +624,7 @@ def settings_import(file_name):
                         continue  # Weiter zum nächsten Eintrag
                     except Exception as e:
                         # Parsing fehlgeschlagen → als Fallback weitermachen
-                        screen_and_log(f"WARNING: Kann Wert für '{section}:{key}' nicht als Dictionary parsen: {e}",
-                                     None, True, auto_log=True)
+                        logger.warning(f"Kann Wert für '{section}:{key}' nicht als Dictionary parsen: {e}")
 
                 # Bool-Werte erkennen und umwandeln
                 if value.lower() in ['true', 'false']:
@@ -711,7 +643,7 @@ def settings_import(file_name):
 
     except Exception as e:
         # Allgemeine Fehlerbehandlung (z. B. Datei beschädigt)
-        screen_and_log(f"ERROR: Fehler beim Laden der Einstellungen: {e}", None, True, auto_log=True)
+        logger.error(f"Fehler beim Laden der Einstellungen: {e}")
         return None
 
 # -------------------------------
@@ -852,7 +784,7 @@ class StructuredConfigParser(configparser.ConfigParser):
             section_dict[key] = self._parse_value(value)
         return section_dict
 
-def load_structured_config(file_name, logfile=None, screen=True):
+def load_structured_config(file_name, logger):
     """
     Load INI file with structured data support and comprehensive error handling.
 
@@ -861,8 +793,7 @@ def load_structured_config(file_name, logfile=None, screen=True):
 
     Args:
         file_name (str): Path to INI configuration file
-        logfile (str, optional): Path to log file for error logging
-        screen (bool): Whether to show messages on screen
+        logger (ExtendedLogger): Logger-Instanz für strukturierte Protokollierung.
 
     Returns:
         StructuredConfigParser: Enhanced config parser with type conversion
@@ -874,13 +805,13 @@ def load_structured_config(file_name, logfile=None, screen=True):
 
     Usage:
         # Method 1: Use as enhanced ConfigParser
-        config = load_structured_config("config.ini")
+        config = load_structured_config("config.ini", logger)
         if config:
             value = config.get_structured("Section", "key", default_value)
             section_data = config.get_section_dict("Section")
 
         # Method 2: Export as dict (like settings_import)
-        config = load_structured_config("config.ini")
+        config = load_structured_config("config.ini", logger)
         if config:
             settings = config.to_dict()  # Same format as settings_import()
     """
@@ -897,15 +828,15 @@ def load_structured_config(file_name, logfile=None, screen=True):
         config = StructuredConfigParser()
         config.read(file_name, encoding='utf-8')  # Use UTF-8 for better compatibility
 
-        screen_and_log(f"Info: Konfigurationsdatei '{file_name}' erfolgreich geladen.", logfile, screen)
+        logger.info(f"Konfigurationsdatei '{file_name}' erfolgreich geladen.")
         return config
 
     except Exception as e:
         # Same error handling as settings_import
-        screen_and_log(f"ERROR: Fehler beim Laden der Konfiguration: {e}", logfile, screen, auto_log=True)
+        logger.error(f"Fehler beim Laden der Konfiguration: {e}")
         return None
 
-def settings_import_structured(file_name, logfile=None, screen=True):
+def settings_import_structured(file_name, logger):
     """
     Enhanced version of settings_import() returning StructuredConfigParser.
 
@@ -913,15 +844,14 @@ def settings_import_structured(file_name, logfile=None, screen=True):
 
     Args:
         file_name (str): Path to INI configuration file
-        logfile (str, optional): Path to log file
-        screen (bool): Whether to show messages on screen
+        logger (ExtendedLogger): Logger-Instanz für strukturierte Protokollierung.
 
     Returns:
         StructuredConfigParser or None: Enhanced config parser or None if failed
 
     Usage:
         # Backwards compatible with settings_import
-        config = settings_import_structured("config.ini")
+        config = settings_import_structured("config.ini", logger)
         if config:
             settings = config.to_dict()  # Same as original settings_import()
 
@@ -929,7 +859,7 @@ def settings_import_structured(file_name, logfile=None, screen=True):
         if config:
             value = config.get_structured("Section", "key", fallback)
     """
-    return load_structured_config(file_name, logfile, screen)
+    return load_structured_config(file_name, logger)
 
 def load_structured_config_with_validation(file_name, validation_error_class=None):
     """

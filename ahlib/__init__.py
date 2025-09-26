@@ -25,7 +25,7 @@ __all__ = [
     'format_excel_as_table_with_freeze', 'format_excel_columns',
 
     # System Utilities (Traditional)
-    'screen_and_log', 'set_working_directory', 'settings_import',
+    'set_working_directory', 'settings_import',
 
     # Configuration
     'StructuredConfigParser', 'load_structured_config_with_validation',
