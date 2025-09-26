@@ -996,3 +996,241 @@ def load_structured_config_with_validation(file_name, validation_error_class=Non
         raise validation_error_class(f"Error reading configuration file: {e}")
 
     return config
+
+
+# -------------------------------
+# Erweiterte Protokollierung (Advanced Logging)
+# -------------------------------
+
+import time
+from typing import Dict, List, Any, Optional
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+
+
+@dataclass
+class VerarbeitungsMetriken:
+    """Detaillierte Metriken für Verarbeitungsoperationen."""
+    dateien_verarbeitet: int = 0
+    dateien_übersprungen: int = 0
+    zeilen_nach_blatt: Dict[str, int] = field(default_factory=dict)
+    fehler_nach_typ: Counter = field(default_factory=Counter)
+    fehler_nach_datei: Dict[str, List[str]] = field(default_factory=lambda: defaultdict(list))
+    zeilen_gesamt_hinzugefügt: int = 0
+    doppelte_zeilen_übersprungen: int = 0
+    verarbeitungszeit_sekunden: float = 0.0
+    startzeit: Optional[float] = None
+
+    def starte_zeitmessung(self) -> None:
+        """Starte die Zeitmessung für die Verarbeitungsoperation."""
+        self.startzeit = time.time()
+
+    def stoppe_zeitmessung(self) -> None:
+        """Stoppe die Zeitmessung und erfasse die Dauer."""
+        if self.startzeit:
+            self.verarbeitungszeit_sekunden = time.time() - self.startzeit
+
+    def füge_blatt_zeilen_hinzu(self, blatt_name: str, zeilen_anzahl: int) -> None:
+        """Füge Zeilenzahl für ein Blatt hinzu."""
+        self.zeilen_nach_blatt[blatt_name] = self.zeilen_nach_blatt.get(blatt_name, 0) + zeilen_anzahl
+        self.zeilen_gesamt_hinzugefügt += zeilen_anzahl
+
+    def füge_fehler_hinzu(self, fehler_typ: str, dateiname: str, fehler_nachricht: str) -> None:
+        """Erfasse einen Fehler."""
+        self.fehler_nach_typ[fehler_typ] += 1
+        self.fehler_nach_datei[dateiname].append(f"{fehler_typ}: {fehler_nachricht}")
+
+    def erfasse_datei_verarbeitet(self) -> None:
+        """Erfasse, dass eine Datei erfolgreich verarbeitet wurde."""
+        self.dateien_verarbeitet += 1
+
+    def erfasse_datei_übersprungen(self, grund: str = "") -> None:
+        """Erfasse, dass eine Datei übersprungen wurde."""
+        self.dateien_übersprungen += 1
+        if grund:
+            self.fehler_nach_typ[f"übersprungen: {grund}"] += 1
+
+
+class ErweiterterLogger:
+    """
+    Erweiterte Protokollierungsklasse für komplexe Verarbeitungsabläufe.
+
+    Bietet strukturierte Protokollierung mit Metriken-Erfassung, Performance-Tracking
+    und detaillierte Fehlerbehandlung. Alternative zu screen_and_log() für komplexe
+    Skripte, die folgende Features benötigen:
+    - Strukturierte Log-Level (INFO/WARNING/ERROR/DEBUG)
+    - Verarbeitungsmetriken und Statistiken
+    - Performance-Tracking
+    - Batch-Operationen und Zusammenfassungen
+
+    Eigenschaften:
+    - Doppelte Ausgabe: Datei-Protokollierung + optionale Konsolen-Ausgabe
+    - Standardisierte Nachrichtenformatierung
+    - Verarbeitungsmetriken und Performance-Tracking
+    - Fehlerbehandlung und Fortschrittsberichte
+    """
+
+    def __init__(self, protokolldatei: str, bildschirm_ausgabe: bool = True, skript_name: str = ""):
+        """
+        Initialisiere Logger mit konsistenter Konfiguration.
+
+        Args:
+            protokolldatei: Pfad zur Protokolldatei
+            bildschirm_ausgabe: Konsolen-Ausgabe aktivieren
+            skript_name: Skript-Identifikator für Protokollnachrichten
+        """
+        self.protokolldatei = Path(protokolldatei)
+        self.bildschirm_ausgabe = bildschirm_ausgabe
+        self.skript_name = skript_name
+        self.metriken = VerarbeitungsMetriken()
+
+        # Stelle sicher, dass das Protokoll-Verzeichnis existiert
+        self.protokolldatei.parent.mkdir(parents=True, exist_ok=True)
+
+    def protokolliere(self, nachricht: str, level: str = "INFO") -> None:
+        """Protokolliere eine Nachricht in Datei und optional Konsole."""
+        zeitstempel = time.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Dateiformat: [zeitstempel] skript_name LEVEL: nachricht
+        skript_teil = f" {self.skript_name}" if self.skript_name else ""
+        datei_formatierte_nachricht = f"[{zeitstempel}]{skript_teil} {level}: {nachricht}"
+
+        # Bildschirmformat: [zeitstempel] LEVEL: nachricht
+        bildschirm_formatierte_nachricht = f"[{zeitstempel}] {level}: {nachricht}"
+
+        # Konsolen-Ausgabe
+        if self.bildschirm_ausgabe:
+            try:
+                print(bildschirm_formatierte_nachricht)
+            except Exception:
+                pass  # Fehler bei Konsolen-Ausgabe nicht weiterleiten
+
+        # Datei-Ausgabe
+        try:
+            with open(self.protokolldatei, "a", encoding="utf-8") as f:
+                f.write(datei_formatierte_nachricht + "\n")
+        except Exception:
+            pass  # Fehler bei Protokollierung nicht weiterleiten
+
+    def info(self, nachricht: str) -> None:
+        """Protokolliere eine Info-Nachricht."""
+        self.protokolliere(nachricht, "INFO")
+
+    def warnung(self, nachricht: str) -> None:
+        """Protokolliere eine Warnung."""
+        self.protokolliere(nachricht, "WARNING")
+
+    def fehler(self, nachricht: str) -> None:
+        """Protokolliere einen Fehler."""
+        self.protokolliere(nachricht, "ERROR")
+
+    def debug(self, nachricht: str) -> None:
+        """Protokolliere eine Debug-Nachricht."""
+        self.protokolliere(nachricht, "DEBUG")
+
+    def starte_verarbeitung(self) -> None:
+        """Markiere den Start der Verarbeitung."""
+        self.metriken.starte_zeitmessung()
+        self.info("Starte Account-Statements-Verarbeitung")
+
+    def beende_verarbeitung(self) -> None:
+        """Markiere das Ende der Verarbeitung und protokolliere Zusammenfassung."""
+        self.metriken.stoppe_zeitmessung()
+        self.protokolliere_zusammenfassung()
+
+    def erfasse_datei_verarbeitet(self, dateiname: str, blatt_name: str, zeilen_anzahl: int, metadaten: Dict[str, Any]) -> None:
+        """Erfasse erfolgreiche Datei-Verarbeitung."""
+        self.metriken.erfasse_datei_verarbeitet()
+        self.metriken.füge_blatt_zeilen_hinzu(blatt_name, zeilen_anzahl)
+
+        parser_info = f"{metadaten.get('parser', 'unbekannt')}"
+        erkennungs_info = f"{metadaten.get('detected_via', [])}"
+
+        self.info(f"Verarbeitet {dateiname} -> {blatt_name}: +{zeilen_anzahl} Zeilen via {parser_info} {erkennungs_info}")
+
+    def erfasse_datei_übersprungen(self, dateiname: str, grund: str) -> None:
+        """Erfasse übersprungene Datei mit Grund."""
+        self.metriken.erfasse_datei_übersprungen(grund)
+        self.warnung(f"Übersprungen {dateiname}: {grund}")
+
+    def erfasse_fehler(self, dateiname: str, fehler_typ: str, fehler_nachricht: str) -> None:
+        """Erfasse das Auftreten eines Fehlers."""
+        self.metriken.füge_fehler_hinzu(fehler_typ, dateiname, fehler_nachricht)
+        self.fehler(f"Fehler in {dateiname} ({fehler_typ}): {fehler_nachricht}")
+
+    def erfasse_archiv_erfolg(self, dateiname: str, ziel: str) -> None:
+        """Erfasse erfolgreiche Datei-Archivierung."""
+        self.info(f"Archiviert: {dateiname} -> {ziel}")
+
+    def erfasse_archiv_fehler(self, dateiname: str, fehler: str) -> None:
+        """Erfasse Archivierungsfehler."""
+        self.fehler(f"Archivierungsfehler für {dateiname}: {fehler}")
+
+    def protokolliere_fortschritt(self, aktuell: int, gesamt: int, element_name: str = "Dateien") -> None:
+        """Protokolliere Fortschrittsinformationen."""
+        if gesamt > 0:
+            prozent = (aktuell / gesamt) * 100
+            self.info(f"Fortschritt: {aktuell}/{gesamt} {element_name} ({prozent:.1f}%)")
+
+    def protokolliere_duplikat_ergebnisse(self, blatt_name: str, gesamt_neu: int, bereits_vorhanden: int, wird_hinzugefügt: int) -> None:
+        """Protokolliere Duplikat-Ergebnisse für ein Blatt."""
+        self.info(f"{blatt_name}: gesamt_neu={gesamt_neu}, bereits_vorhanden={bereits_vorhanden}, wird_hinzugefügt={wird_hinzugefügt}")
+        self.metriken.doppelte_zeilen_übersprungen += bereits_vorhanden
+
+    def protokolliere_zusammenfassung(self) -> None:
+        """Protokolliere Verarbeitungszusammenfassung."""
+        self.info("===== Verarbeitungszusammenfassung =====")
+        self.info(f"Dateien verarbeitet: {self.metriken.dateien_verarbeitet}")
+        self.info(f"Dateien übersprungen: {self.metriken.dateien_übersprungen}")
+        self.info(f"Zeilen gesamt hinzugefügt: {self.metriken.zeilen_gesamt_hinzugefügt}")
+        self.info(f"Doppelte Zeilen übersprungen: {self.metriken.doppelte_zeilen_übersprungen}")
+        self.info(f"Verarbeitungszeit: {self.metriken.verarbeitungszeit_sekunden:.2f} Sekunden")
+
+        if self.metriken.zeilen_nach_blatt:
+            self.info("Zeilen nach Blatt:")
+            for blatt, anzahl in self.metriken.zeilen_nach_blatt.items():
+                self.info(f"  {blatt}: {anzahl}")
+
+        if self.metriken.fehler_nach_typ:
+            self.info("Aufgetretene Fehler:")
+            for fehler_typ, anzahl in self.metriken.fehler_nach_typ.items():
+                self.info(f"  {fehler_typ}: {anzahl}")
+
+        # Performance-Info
+        if self.metriken.verarbeitungszeit_sekunden > 0:
+            dateien_pro_sekunde = self.metriken.dateien_verarbeitet / self.metriken.verarbeitungszeit_sekunden
+            zeilen_pro_sekunde = self.metriken.zeilen_gesamt_hinzugefügt / self.metriken.verarbeitungszeit_sekunden
+            self.info(f"Performance: {dateien_pro_sekunde:.2f} Dateien/Sek, {zeilen_pro_sekunde:.1f} Zeilen/Sek")
+
+    def hole_metriken(self) -> VerarbeitungsMetriken:
+        """Hole das aktuelle Metriken-Objekt."""
+        return self.metriken
+
+
+def erstelle_erweiterten_logger(protokolldatei_pfad: str, bildschirm_ausgabe: bool = True,
+                               skript_name: str = "") -> ErweiterterLogger:
+    """
+    Erstelle eine ErweiterterLogger-Instanz.
+
+    Alternative zu screen_and_log() für Skripte, die folgende Features benötigen:
+    - Strukturierte Protokoll-Level (INFO/WARNING/ERROR/DEBUG)
+    - Verarbeitungsmetriken und Statistiken
+    - Performance-Tracking
+    - Batch-Operationen und detaillierte Zusammenfassungen
+
+    Args:
+        protokolldatei_pfad: Pfad zur Protokolldatei
+        bildschirm_ausgabe: Konsolen-Ausgabe aktivieren (Standard: True)
+        skript_name: Name des aufrufenden Skripts (z.B. 'as_1_extract')
+
+    Returns:
+        ErweiterterLogger: Konfigurierte Logger-Instanz
+
+    Verwendung:
+        from ahlib import erstelle_erweiterten_logger
+        logger = erstelle_erweiterten_logger("verarbeitung.log", True, "mein_skript")
+        logger.info("Verarbeitung gestartet")
+        logger.erfasse_datei_verarbeitet("datei.csv", "Blatt1", 1000, {"parser": "CSV"})
+        logger.protokolliere_zusammenfassung()
+    """
+    return ErweiterterLogger(protokolldatei_pfad, bildschirm_ausgabe, skript_name)
