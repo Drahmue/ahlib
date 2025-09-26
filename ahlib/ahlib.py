@@ -1000,12 +1000,14 @@ class ExtendedLogger:
         """Log a message to file and optionally console."""
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
-        # File format: [timestamp] script_name LEVEL: message
+        # Prepare script name part
         script_part = f" {self.script_name}" if self.script_name else ""
+
+        # File format: [timestamp] script_name LEVEL: message
         file_formatted_message = f"[{timestamp}]{script_part} {level}: {message}"
 
-        # Screen format: LEVEL: message (no timestamp)
-        screen_formatted_message = f"{level}: {message}"
+        # Screen format: LEVEL: scriptname message (no timestamp)
+        screen_formatted_message = f"{level}:{script_part} {message}"
 
         # Console output
         if self.screen_output:
