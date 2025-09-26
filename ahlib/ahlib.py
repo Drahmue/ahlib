@@ -1004,8 +1004,8 @@ class ExtendedLogger:
         script_part = f" {self.script_name}" if self.script_name else ""
         file_formatted_message = f"[{timestamp}]{script_part} {level}: {message}"
 
-        # Screen format: clean message (no timestamp)
-        screen_formatted_message = message
+        # Screen format: LEVEL: message (no timestamp)
+        screen_formatted_message = f"{level}: {message}"
 
         # Console output
         if self.screen_output:
