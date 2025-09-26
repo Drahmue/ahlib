@@ -150,8 +150,6 @@ def export_2D_df_to_excel_pivot(df, filename, logger, sheet_name='Sheet1'):
             raise ValueError("Das übergebene Objekt ('df') ist kein gültiger pandas.DataFrame.")
         if not isinstance(filename, str):
             raise ValueError("Der Dateiname ('filename') muss ein String sein.")
-        if logfile and not isinstance(logfile, str):
-            raise ValueError("Der Logfile-Pfad ('logfile') muss ein String sein.")
 
         # Überprüfen, ob der Dateiname eine .xlsx-Endung hat
         if not filename.endswith('.xlsx'):
@@ -215,8 +213,6 @@ def export_2D_df_to_excel_clean_table(df, filename, logger, sheet_name='Sheet1')
             raise ValueError("Das übergebene Objekt ('df') ist kein gültiger pandas.DataFrame.")
         if not isinstance(filename, str):
             raise ValueError("Der Dateiname ('filename') muss ein String sein.")
-        if logfile and not isinstance(logfile, str):
-            raise ValueError("Der Logfile-Pfad ('logfile') muss ein String sein.")
         if not filename.endswith('.xlsx'):
             raise ValueError(f"Die Datei '{filename}' hat keine gültige '.xlsx'-Endung.")
         dir_name = os.path.dirname(filename)
@@ -396,8 +392,7 @@ def format_excel_columns(filename, column_formats, logger, column_widths=None):
         column_formats (list): Liste von Formatstrings für Spalten (z. B. "DD.MM.YY", "#,##0.00").
         column_widths (list, optional): Liste von Breiten je Spalte. Wird die Liste überschritten,
                                         wird die letzte Breite wiederverwendet.
-        logfile (str, optional): Optionaler Pfad zu einer Logdatei.
-        screen (bool): Statusausgabe auf dem Bildschirm.
+        logger (ExtendedLogger): Logger-Instanz für strukturierte Protokollierung.
         
     Rückgabe:
         bool: True bei erfolgreichem Formatieren, False bei Fehler.
@@ -411,8 +406,6 @@ def format_excel_columns(filename, column_formats, logger, column_widths=None):
             raise ValueError("Die Spaltenformate ('column_formats') müssen eine Liste von Strings sein.")
         if column_widths and (not isinstance(column_widths, list) or not all(isinstance(w, (int, float)) for w in column_widths)):
             raise ValueError("Die Spaltenbreiten ('column_widths') müssen eine Liste von Zahlen sein.")
-        if logfile and not isinstance(logfile, str):
-            raise ValueError("Der Logfile-Pfad ('logfile') muss ein String sein.")
 
         if not os.path.isfile(filename):
             raise FileNotFoundError(f"Die Datei '{filename}' wurde nicht gefunden.")
