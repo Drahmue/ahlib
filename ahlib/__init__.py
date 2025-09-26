@@ -30,6 +30,6 @@ __all__ = [
     # Configuration
     'StructuredConfigParser', 'load_structured_config_with_validation',
 
-    # Advanced Logging (New)
-    'ErweiterterLogger', 'VerarbeitungsMetriken', 'erstelle_erweiterten_logger'
+    # Advanced Logging (English)
+    'ExtendedLogger', 'ProcessingMetrics', 'create_extended_logger'
 ]
